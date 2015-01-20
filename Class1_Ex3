@@ -1,0 +1,46 @@
+def main():
+
+	import pysnmp
+	import paramiko
+	from snmp_helper import snmp_get_oid, snmp_extract
+
+	IP = '50.242.94.227'
+	COMMUNITY_STRING = 'galileo'
+	network_devices = {
+		'rtr_1': (IP, COMMUNITY_STRING, 7961),
+		'rtr_2': (IP, COMMUNITY_STRING, 8061)
+	}
+
+	RUN_LAST_CHANGE_OID = '1.3.6.1.4.1.9.9.43.1.1.1.0'
+	START_LAST_CHANGE_OID = '1.3.6.1.4.1.9.9.43.1.1.3.0'
+	SYS_UPTIME_OID = '1.3.6.1.2.1.1.3.0'
+	oid = (RUN_LAST_CHANGE_OID, START_LAST_CHANGE_OID, SYS_UPTIME_OID)
+	
+	for hostname, snmp_connection in network_devices.items():
+		output = []
+
+		for oid_val in oid:
+			snmp_data = snmp_get_oid(snmp_connection, oid = oid_val)
+			output.append(int(snmp_extract(snmp_data)))
+			
+		run_last_change, start_last_change, sys_uptime = output
+	
+		sys_uptime_hours = sys_uptime/100.0/3600.0
+	
+		print "\nNetwork Device is %s" % hostname
+		print "System is up since %.1f hours" % sys_uptime_hours
+		print "Last Configuration Change %s seconds ago" % run_last_change
+		print "Last Configuration Save %s seconds ago" % start_last_change
+	
+		if run_last_change > start_last_change:
+			if not(start_last_change):
+				print "Configuration has not been saved, since the last reboot"
+			else:
+				print "Configuration has changed but not saved"
+		else:
+			print "Configuration has been saved"
+			
+		print 
+
+if __name__ == '__main__':
+	main()
