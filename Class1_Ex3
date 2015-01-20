@@ -4,8 +4,8 @@ def main():
 	import paramiko
 	from snmp_helper import snmp_get_oid, snmp_extract
 
-	IP = '50.242.94.227'
-	COMMUNITY_STRING = 'galileo'
+	IP = '*.*.*.*'
+	COMMUNITY_STRING = '*****'
 	network_devices = {
 		'rtr_1': (IP, COMMUNITY_STRING, 7961),
 		'rtr_2': (IP, COMMUNITY_STRING, 8061)
