@@ -1,0 +1,97 @@
+import cPickle as pickle
+import os.path
+
+from snmp_helper import snmp_get_oid_v3, snmp_extract
+from email_helper import send_mail
+
+from datetime import datetime
+
+RUN_LAST_CHANGE_OID = '1.3.6.1.4.1.9.9.43.1.1.1.0'
+SYS_UPTIME_OID = '1.3.6.1.2.1.1.3.0'
+SYS_NAME_OID = '1.3.6.1.2.1.1.5.0'
+
+RELOAD_WINDOW = 300 * 100
+
+def saved_devices_load(pickle_file):
+	if not os.path.isfile(pickle_file):
+		return {}
+	
+	with open(pickle_file, 'rb') as f:
+		net_devices = pickle.load(f)
+	return net_devices
+
+def send_notification(device_name):
+
+	current_time = datetime.now()
+
+	sender = 'kashif@twb-tech.com'
+	recipient = 'kashifrana@gmail.com'
+	subject = 'Configuration of %s was modified' % device_name
+
+	message = '''
+	The running configuration of %s was modified.  
+	This change was detected at: %s
+	''' %(device_name, current_time)
+
+	if send_mail(recipient, subject, message, sender):
+		print 'Email notification sent to %s' % recipient
+		return True
+
+def main():
+
+	ip_address = '10.10.10.10'
+	user_name = 'xxxx'
+	auth_key = 'xxxx'
+	encryption_key = 'xxxx'
+	
+	snmp_devices = [(ip_address, 7961), (ip_address, 8061)]
+	snmp_user = (user_name, auth_key, encryption_key)
+	oid = (RUN_LAST_CHANGE_OID, SYS_NAME_OID, SYS_UPTIME_OID)
+	
+	net_dev_file = 'netdev.pkl'
+	saved_devices = saved_devices_load(net_dev_file)
+	
+
+	for snmp_device in snmp_devices:
+	
+		output = []
+		for oid_val in oid:
+			snmp_data = snmp_get_oid_v3(snmp_device, snmp_user, oid = oid_val)
+			output.append(snmp_extract(snmp_data))
+			
+		run_last_change, sys_name, sys_uptime = output
+		
+		if sys_name in saved_devices:
+			print "\n", sys_name
+			run_conf_saved, run_conf_current = saved_devices[sys_name], int(run_last_change)
+			saved_devices[sys_name] = run_conf_current
+			
+			if run_conf_current < run_conf_saved:
+			
+				if run_conf_current <= RELOAD_WINDOW:
+					print "NO CONFIGURATION CHANGE"
+				
+				else:
+					print "CONFIGURATION HAS CHANGED"
+					send_notification(sys_name) 
+					
+			elif run_conf_current == run_conf_saved:
+				print "NO CONFIGURATION CHANGE"
+				
+			elif run_conf_current > run_conf_saved:
+				print "CONFIGURATION HAS CHANGED"
+				send_notification(sys_name)
+				
+		else:
+			print "\n", sys_name
+			print "Saving New Device"
+			run_conf_current = int(run_last_change)
+			saved_devices[sys_name] = run_conf_current
+	
+	with open(net_dev_file, 'wb') as f:
+		pickle.dump(saved_devices, f)
+		
+	print 
+			
+if __name__ == '__main__':
+	main()
